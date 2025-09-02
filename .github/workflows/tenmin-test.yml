@@ -1,0 +1,49 @@
+name: Barnet 10-Min Test
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes (UTC)
+  workflow_dispatch:          # manual Run button
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show UTC time (sanity)
+        run: date -u
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Playwright & deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Run script (CI email skip)
+        env:
+          BARNET_USER: ${{ secrets.BARNET_USER }}
+          BARNET_PASS: ${{ secrets.BARNET_PASS }}
+          DOWNLOAD_DIR: out
+          DRY_RUN_EMAIL: "1"
+        run: |
+          mkdir -p out
+          python auto_barnet_restock.py
+
+      - name: Upload outputs (artifacts)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: out-${{ github.run_id }}
+          path: |
+            out/**
+            *.log
